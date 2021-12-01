@@ -1,5 +1,8 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using AutoMapper;
+using Microsoft.EntityFrameworkCore;
+using SchoolOfDevs.Dto.User;
 using SchoolOfDevs.Entities;
+using SchoolOfDevs.Enuns;
 using SchoolOfDevs.Exceptions;
 using SchoolOfDevs.Helpers;
 using BC = BCrypt.Net.BCrypt;
@@ -8,40 +11,55 @@ namespace SchoolOfDevs.Services
 {
     public interface IUserService
     {
-        public Task<User> Create(User user);
-        public Task<User> GetById(int id);
-        public Task<List<User>> GetAll();
-        public Task Update(User userIn, int id);
+        public Task<UserResponse> Create(UserRequest userRequest);
+        public Task<UserResponse> GetById(int id);
+        public Task<List<UserResponse>> GetAll();
+        public Task Update(UserRequestUpdate userRequest, int id);
         public Task Delete(int id);
     }
 
     public class UserService : IUserService
     {
         private readonly DataContext _context;
+        private readonly IMapper _mapper;
 
-        public UserService(DataContext context)
+        public UserService(DataContext context, IMapper mapper)
         {
             _context = context;
+            _mapper = mapper;
         }
 
-        public async Task<User> Create(User user)
+        public async Task<UserResponse> Create(UserRequest userRequest)
         {
-            if (!user.Password.Equals(user.ConfirmPassword))
+            if (!userRequest.Password.Equals(userRequest.ConfirmPassword))
                 throw new BadRequestException("Password does not match ConfirmPassword");
 
             User userDb = await _context.Users
                 .AsNoTracking()
-                .SingleOrDefaultAsync(u => u.UserName == user.UserName);
+                .SingleOrDefaultAsync(u => u.UserName == userRequest.UserName);
 
             if (userDb is not null)
-                throw new BadRequestException($"UserName {user.UserName} already exist.");
+                throw new BadRequestException($"UserName {userRequest.UserName} already exist.");
+
+            User user = _mapper.Map<User>(userRequest);
+
+            if (user.TypeUser != TypeUser.Teacher && userRequest.CoursesStudingIds.Any())
+            {
+                user.CoursesStuding = new List<Course>();
+                List<Course> courses = await _context.Courses
+                    .Where(e => userRequest.CoursesStudingIds.Contains(e.Id))
+                    .ToListAsync();
+
+                foreach (Course course in courses)
+                    user.CoursesStuding.Add(course);
+            }
 
             user.Password = BC.HashPassword(user.Password);
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            return user;
+            return _mapper.Map<UserResponse>(user);
         }
 
         public async Task Delete(int id)
@@ -56,40 +74,80 @@ namespace SchoolOfDevs.Services
             await _context.SaveChangesAsync();
         }
 
-        public async Task<List<User>> GetAll() => await _context.Users.ToListAsync();
+        public async Task<List<UserResponse>> GetAll()
+        {
+            List<User> users = await _context.Users.ToListAsync();
 
-        public async Task<User> GetById(int id)
+            return users.Select(e => _mapper.Map<UserResponse>(e)).ToList();
+        }
+
+        public async Task<UserResponse> GetById(int id)
         {
             User userDb = await _context.Users
+                .Include(e => e.CoursesStuding) // Student
+                .Include(e => e.CoursesTeaching) // Teacher
                 .SingleOrDefaultAsync(u => u.Id == id);
 
             if (userDb is null)
                 throw new KeyNotFoundException($"User {id} not found");
 
-            return userDb;
+            return _mapper.Map<UserResponse>(userDb);
         }
 
-        public async Task Update(User userIn, int id)
+        public async Task Update(UserRequestUpdate userRequest, int id)
         {
-            if (userIn.Id != id)
+            if (userRequest.Id != id)
                 throw new BadRequestException("Route id differs User id");
-            else if (!userIn.Password.Equals(userIn.ConfirmPassword))
+            else if (!userRequest.Password.Equals(userRequest.ConfirmPassword))
                 throw new BadRequestException("Password does not match ConfirmPassword");
 
             User userDb = await _context.Users
-                .AsNoTracking()
+                .Include(e => e.CoursesStuding)
                 .SingleOrDefaultAsync(u => u.Id == id);
 
             if (userDb is null)
                 throw new KeyNotFoundException($"User {id} not found");
-            else if (!BC.Verify(userIn.CurrentPassword, userDb.Password))
+            else if (!BC.Verify(userRequest.CurrentPassword, userDb.Password))
                 throw new BadRequestException("Incorrect Password");
 
-            userIn.CreatedAt = userDb.CreatedAt;
-            userIn.Password = BC.HashPassword(userIn.Password);
+            await AddOrRemoveCourse(userDb, userRequest.CoursesStudingIds);
 
-            _context.Entry(userIn).State = EntityState.Modified;
+            userDb = _mapper.Map<User>(userRequest); // Talvez o CreatedAt possa ser defult
+            userDb.Password = BC.HashPassword(userRequest.Password);
+
+            _context.Entry(userDb).State = EntityState.Modified;
             await _context.SaveChangesAsync();
+        }
+
+        private async Task AddOrRemoveCourse(User userDb, int[] coursesIds)
+        {
+            int[] removedIds = userDb.CoursesStuding.Where(e =>
+                !coursesIds.Contains(e.Id))
+                .Select(e => e.Id).ToArray();
+            int[] addedIds = coursesIds
+                .Where(e => !userDb.CoursesStuding.Select(u => u.Id).ToArray().Contains(e))
+                .ToArray();
+
+            if (!removedIds.Any() && !addedIds.Any())
+            {
+                _context.Entry(userDb).State = EntityState.Detached;
+                return;
+            }
+
+            List<Course> tempCourse = await _context.Courses
+                .Where(e => removedIds.Contains(e.Id) || addedIds.Contains(e.Id))
+                .ToListAsync();
+
+            List<Course> coursesToBeRemoved = tempCourse.Where(e => removedIds.Contains(e.Id)).ToList();
+            foreach (Course course in coursesToBeRemoved)
+                userDb.CoursesStuding.Remove(course);
+
+            List<Course> coursesToBeAdded = tempCourse.Where(e => addedIds.Contains(e.Id)).ToList();
+            foreach (Course course in coursesToBeAdded)
+                userDb.CoursesStuding.Add(course);
+
+            await _context.SaveChangesAsync();
+            _context.Entry(userDb).State = EntityState.Detached;
         }
     }
 }

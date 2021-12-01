@@ -55,19 +55,21 @@ namespace SchoolOfDevs.Services
             return courseDb;
         }
 
-        public async Task Update(Course couseIn, int id)
+        public async Task Update(Course courseIn, int id)
         {
-            if (couseIn.Id != id)
+            if (courseIn.Id != id)
                 throw new Exception("Route id differs Course id");
 
-            Course userDb = await _context.Courses
+            Course courseDb = await _context.Courses
                 .AsNoTracking()
                 .SingleOrDefaultAsync(u => u.Id == id);
 
-            if (userDb is null)
+            if (courseDb is null)
                 throw new Exception($"Course {id} not found");
 
-            _context.Entry(couseIn).State = EntityState.Modified;
+            courseIn.CreatedAt = courseDb.CreatedAt;
+
+            _context.Entry(courseIn).State = EntityState.Modified;
             await _context.SaveChangesAsync();
         }
     }

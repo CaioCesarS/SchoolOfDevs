@@ -1,4 +1,6 @@
 ﻿using SchoolOfDevs.Enuns;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace SchoolOfDevs.Entities
 {
@@ -9,6 +11,10 @@ namespace SchoolOfDevs.Entities
         public int Age { get; set; }
         public string UserName { get; set; }
         public string Password { get; set; }
+        [NotMapped]
+        public string ConfirmPassword { get; set; }
+        [NotMapped]
+        public string CurrentPassword { get; set; }
         public TypeUser TypeUser { get; set; }
     }
 }

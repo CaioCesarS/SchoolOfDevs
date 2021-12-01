@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SchoolOfDevs.Entities;
+using SchoolOfDevs.Enuns;
 using SchoolOfDevs.Exceptions;
 using SchoolOfDevs.Helpers;
 

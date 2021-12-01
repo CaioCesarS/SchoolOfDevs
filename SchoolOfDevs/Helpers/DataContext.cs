@@ -16,6 +16,28 @@ namespace SchoolOfDevs.Helpers
                 .HasConversion(
                     v => v.ToString(),
                     v => (TypeUser)Enum.Parse(typeof(TypeUser), v));
+
+            builder.Entity<Course>()
+                .HasOne(e => e.Teacher)
+                .WithMany(c => c.CoursesTeaching)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<Course>()
+            .HasMany(p => p.Students)
+            .WithMany(p => p.CoursesStuding)
+            .UsingEntity<StudentCourse>(
+                j => j
+                    .HasOne(pt => pt.Student)
+                    .WithMany(t => t.StudentCourses)
+                    .HasForeignKey(pt => pt.StudentId),
+                j => j
+                    .HasOne(pt => pt.Course)
+                    .WithMany(p => p.StudentCourses)
+                    .HasForeignKey(pt => pt.CourseId),
+                j =>
+                {
+                    j.HasKey(t => new { t.CourseId, t.StudentId });
+                });
         }
 
         public override Task<int> SaveChangesAsync(

@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using SchoolOfDevs.Entities;
+using SchoolOfDevs.Dto.Course;
 using SchoolOfDevs.Services;
 
 namespace SchoolOfDevs.Controllers
@@ -16,7 +16,7 @@ namespace SchoolOfDevs.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody] Course course) =>
+        public async Task<IActionResult> Create([FromBody] CourseRequest course) =>
             Ok(await _service.Create(course));
 
         [HttpGet]
@@ -26,7 +26,7 @@ namespace SchoolOfDevs.Controllers
         public async Task<IActionResult> GetById(int id) => Ok(await _service.GetById(id));
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update([FromBody] Course course, int id)
+        public async Task<IActionResult> Update([FromBody] CourseRequest course, int id)
         {
             await _service.Update(course, id);
             return NoContent();

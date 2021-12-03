@@ -1,5 +1,4 @@
-﻿using SchoolOfDevs.Entities;
-using SchoolOfDevs.Enuns;
+﻿using SchoolOfDevs.Enuns;
 
 namespace SchoolOfDevs.Dto.User
 {
@@ -13,7 +12,7 @@ namespace SchoolOfDevs.Dto.User
         public TypeUser TypeUser { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
-        public List<Course> CoursesStuding { get; set; } // TypeUser == Student
-        public List<Course> CoursesTeaching { get; set; } // TypeUser == Teacher
+        public List<Entities.Course> CoursesStuding { get; set; } // TypeUser == Student
+        public List<Entities.Course> CoursesTeaching { get; set; } // TypeUser == Teacher
     }
 }

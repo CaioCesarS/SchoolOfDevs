@@ -11,6 +11,7 @@ namespace SchoolOfDevs.Services
 {
     public interface IUserService
     {
+        public Task<AuthenticateResponse> Authenticate(AuthenticateRequest request);
         public Task<UserResponse> Create(UserRequest userRequest);
         public Task<UserResponse> GetById(int id);
         public Task<List<UserResponse>> GetAll();
@@ -22,11 +23,30 @@ namespace SchoolOfDevs.Services
     {
         private readonly DataContext _context;
         private readonly IMapper _mapper;
+        private readonly IJwtService _jwtService;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public UserService(DataContext context, IMapper mapper)
+        public UserService(DataContext context, IMapper mapper, IJwtService jwtService, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
             _mapper = mapper;
+            _jwtService = jwtService;
+            _httpContextAccessor = httpContextAccessor;
+        }
+
+        public async Task<AuthenticateResponse> Authenticate(AuthenticateRequest request)
+        {
+            User userDb = await _context.Users
+                .SingleOrDefaultAsync(u => u.UserName == request.UserName);
+
+            if (userDb is null)
+                throw new KeyNotFoundException($"User {request.UserName} not found");
+            else if (!BC.Verify(request.Password, userDb.Password))
+                throw new BadRequestException("Incorrect Password");
+
+            string token = _jwtService.GenerateJwtToken(userDb);
+
+            return new AuthenticateResponse(userDb, token);
         }
 
         public async Task<UserResponse> Create(UserRequest userRequest)
@@ -38,7 +58,7 @@ namespace SchoolOfDevs.Services
                 .AsNoTracking()
                 .SingleOrDefaultAsync(u => u.UserName == userRequest.UserName);
 
-            if (userDb is not null)
+            if (userDb != null)
                 throw new BadRequestException($"UserName {userRequest.UserName} already exist.");
 
             User user = _mapper.Map<User>(userRequest);
@@ -67,8 +87,12 @@ namespace SchoolOfDevs.Services
             User userDb = await _context.Users
                 .SingleOrDefaultAsync(u => u.Id == id);
 
+            UserResponse currentUser = (UserResponse)_httpContextAccessor?.HttpContext?.Items["User"];
+
             if (userDb is null)
                 throw new KeyNotFoundException($"User {id} not found");
+            else if (currentUser?.Id != userDb.Id)
+                throw new ForbiddenException("Forbbiden");
 
             _context.Users.Remove(userDb);
             await _context.SaveChangesAsync();
@@ -105,8 +129,12 @@ namespace SchoolOfDevs.Services
                 .Include(e => e.CoursesStuding)
                 .SingleOrDefaultAsync(u => u.Id == id);
 
+            UserResponse currentUser = (UserResponse)_httpContextAccessor?.HttpContext?.Items["User"];
+
             if (userDb is null)
                 throw new KeyNotFoundException($"User {id} not found");
+            else if (currentUser?.Id != userDb.Id)
+                throw new ForbiddenException("Forbbiden");
             else if (!BC.Verify(userRequest.CurrentPassword, userDb.Password))
                 throw new BadRequestException("Incorrect Password");
 

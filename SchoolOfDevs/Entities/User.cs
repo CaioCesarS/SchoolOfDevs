@@ -1,5 +1,4 @@
 ﻿using SchoolOfDevs.Enuns;
-using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 
 namespace SchoolOfDevs.Entities
@@ -10,11 +9,8 @@ namespace SchoolOfDevs.Entities
         public string LastName { get; set; }
         public int Age { get; set; }
         public string UserName { get; set; }
+        [JsonIgnore]
         public string Password { get; set; }
-        [NotMapped]
-        public string ConfirmPassword { get; set; }
-        [NotMapped]
-        public string CurrentPassword { get; set; }
         public TypeUser TypeUser { get; set; }
         [JsonIgnore]
         public ICollection<Course> CoursesTeaching { get; set; }
